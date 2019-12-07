@@ -140,6 +140,16 @@ class Interpreter(StrictNodeVisitor):
         r = self.visit(node.right)
         return binop_map[type(node.op)](l, r)
 
+    def visit_UnaryOp(self, node):
+        unop_map = {
+            ast.UAdd: lambda x: +x,
+            ast.USub: lambda x: -x,
+            ast.Invert: lambda x: ~x,
+            ast.Not: lambda x: not x,
+        }
+        val = self.visit(node.operand)
+        return unop_map[type(node.op)](val)
+
     def visit_Attribute(self, node):
         obj = self.visit(node.value)
         if isinstance(node.ctx, ast.Load):
