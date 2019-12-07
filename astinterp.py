@@ -136,6 +136,17 @@ class Interpreter(StrictNodeVisitor):
         r = self.visit(node.right)
         return binop_map[type(node.op)](l, r)
 
+    def visit_Attribute(self, node):
+        obj = self.visit(node.value)
+        if isinstance(node.ctx, ast.Load):
+            return getattr(obj, node.attr)
+        elif isinstance(node.ctx, ast.Store):
+            setattr(obj, node.attr, self.store_val)
+        elif isinstance(node.ctx, ast.Del):
+            delattr(obj, node.attr)
+        else:
+            raise NotImplementedError
+
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
             if node.id in self.ns:
