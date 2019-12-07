@@ -150,6 +150,21 @@ class Interpreter(StrictNodeVisitor):
         val = self.visit(node.operand)
         return unop_map[type(node.op)](val)
 
+    def visit_Subscript(self, node):
+        obj = self.visit(node.value)
+        idx = self.visit(node.slice)
+        if isinstance(node.ctx, ast.Load):
+            return obj[idx]
+        elif isinstance(node.ctx, ast.Store):
+            obj[idx] = self.store_val
+        elif isinstance(node.ctx, ast.Del):
+            del obj[idx]
+        else:
+            raise NotImplementedError
+
+    def visit_Index(self, node):
+        return self.visit(node.value)
+
     def visit_Attribute(self, node):
         obj = self.visit(node.value)
         if isinstance(node.ctx, ast.Load):
