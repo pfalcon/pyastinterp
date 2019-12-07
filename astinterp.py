@@ -60,6 +60,15 @@ class Interpreter(StrictNodeVisitor):
     def visit_Expression(self, node):
         return self.visit(node.body)
 
+    def visit_For(self, node):
+        iter = self.visit(node.iter)
+        for item in iter:
+            self.store_val = item
+            self.visit(node.target)
+            self.stmt_list_visit(node.body)
+        else:
+            self.stmt_list_visit(node.orelse)
+
     def visit_If(self, node):
         test = self.visit(node.test)
         if test:
