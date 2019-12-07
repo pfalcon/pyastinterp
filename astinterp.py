@@ -98,7 +98,10 @@ class Interpreter(StrictNodeVisitor):
         if isinstance(node.ctx, ast.Load):
             if node.id in self.ns:
                 return self.ns[node.id]
-            return getattr(builtins, node.id)
+            try:
+                return getattr(builtins, node.id)
+            except AttributeError:
+                raise NameError("name '{}' is not defined".format(node.id))
         elif isinstance(node.ctx, ast.Store):
             self.ns[node.id] = self.store_val
         elif isinstance(node.ctx, ast.Del):
