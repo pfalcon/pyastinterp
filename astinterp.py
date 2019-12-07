@@ -176,6 +176,12 @@ class Interpreter(StrictNodeVisitor):
         else:
             raise NotImplementedError
 
+    def visit_List(self, node):
+        return [self.visit(e) for e in node.elts]
+
+    def visit_Tuple(self, node):
+        return tuple([self.visit(e) for e in node.elts])
+
     def visit_NameConstant(self, node):
         return node.value
 
