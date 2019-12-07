@@ -36,6 +36,16 @@ class StrictNodeVisitor(ast.NodeVisitor):
         raise NotImplementedError("Visitor for node {} not implemented".format(n))
 
 
+# Pycopy by default doesn't support direct slice construction, use helper
+# object to construct it.
+class SliceGetter:
+
+    def __getitem__(self, idx):
+        return idx
+
+slice_getter = SliceGetter()
+
+
 class Interpreter(StrictNodeVisitor):
 
     def __init__(self):
@@ -164,6 +174,14 @@ class Interpreter(StrictNodeVisitor):
 
     def visit_Index(self, node):
         return self.visit(node.value)
+
+    def visit_Slice(self, node):
+        # Any of these can be None
+        lower = node.lower and self.visit(node.lower)
+        upper = node.upper and self.visit(node.upper)
+        step = node.step and self.visit(node.step)
+        slice = slice_getter[lower:upper:step]
+        return slice
 
     def visit_Attribute(self, node):
         obj = self.visit(node.value)
