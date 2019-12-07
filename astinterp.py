@@ -60,6 +60,13 @@ class Interpreter(StrictNodeVisitor):
     def visit_Expression(self, node):
         return self.visit(node.body)
 
+    def visit_If(self, node):
+        test = self.visit(node.test)
+        if test:
+            self.stmt_list_visit(node.body)
+        else:
+            self.stmt_list_visit(node.orelse)
+
     def visit_Assign(self, node):
         self.store_val = self.visit(node.value)
         for n in node.targets:
