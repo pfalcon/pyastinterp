@@ -60,6 +60,26 @@ class Interpreter(StrictNodeVisitor):
     def visit_Expression(self, node):
         return self.visit(node.body)
 
+    def visit_Try(self, node):
+        try:
+            self.stmt_list_visit(node.body)
+            self.stmt_list_visit(node.finalbody)
+        except Exception as e:
+            for h in node.handlers:
+                if h.type is None or isinstance(e, self.visit(h.type)):
+                    if h.name:
+                        self.ns[h.name] = e
+                    self.stmt_list_visit(h.body)
+                    if h.name:
+                        del self.ns[h.name]
+                    self.stmt_list_visit(node.finalbody)
+                    break
+            else:
+                self.stmt_list_visit(node.finalbody)
+                raise
+        # Could use "finally:" here to not repeat
+        # stmt_list_visit(node.finalbody) 3 times
+
     def visit_For(self, node):
         iter = self.visit(node.iter)
         for item in iter:
