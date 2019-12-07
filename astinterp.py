@@ -96,6 +96,12 @@ class Interpreter(StrictNodeVisitor):
         else:
             self.stmt_list_visit(node.orelse)
 
+    def visit_Raise(self, node):
+        if node.cause is None:
+            raise self.visit(node.exc)
+        else:
+            raise self.visit(node.exc) from self.visit(node.cause)
+
     def visit_Assign(self, node):
         self.store_val = self.visit(node.value)
         for n in node.targets:
