@@ -198,6 +198,8 @@ class Interpreter(StrictNodeVisitor):
     def visit_Try(self, node):
         try:
             self.stmt_list_visit(node.body)
+        except TargetNonlocalFlow:
+            raise
         except Exception as e:
             self.cur_exc = e
             for h in node.handlers:
