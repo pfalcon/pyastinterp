@@ -116,6 +116,55 @@ class Interpreter(StrictNodeVisitor):
         else:
             raise self.visit(node.exc) from self.visit(node.cause)
 
+    def visit_AugAssign(self, node):
+        assert isinstance(node.target.ctx, ast.Store)
+        # Not functional style, oops. Node in AST has store context, but we
+        # need to read its value first. To not construct a copy of the entire
+        # node with load context, we temporarily patch it in-place.
+        save_ctx = node.target.ctx
+        node.target.ctx = ast.Load()
+        var_val = self.visit(node.target)
+        node.target.ctx = save_ctx
+
+        rval = self.visit(node.value)
+
+        # As augmented assignment is statement, not operator, we can't put them
+        # all into map. We could instead directly lookup special inplace methods
+        # (__iadd__ and friends) and use them, with a fallback to normal binary
+        # operations, but from the point of view of this interpreter, presence
+        # of such methods is an implementation detail of the object system, it's
+        # not concerned with it.
+        op = type(node.op)
+        if op is ast.Add:
+            var_val += rval
+        elif op is ast.Sub:
+            var_val -= rval
+        elif op is ast.Mult:
+            var_val *= rval
+        elif op is ast.Div:
+            var_val /= rval
+        elif op is ast.FloorDiv:
+            var_val //= rval
+        elif op is ast.Mod:
+            var_val %= rval
+        elif op is ast.Pow:
+            var_val **= rval
+        elif op is ast.LShift:
+            var_val <<= rval
+        elif op is ast.RShift:
+            var_val >>= rval
+        elif op is ast.BitAnd:
+            var_val &= rval
+        elif op is ast.BitOr:
+            var_val |= rval
+        elif op is ast.BitXor:
+            var_val ^= rval
+        else:
+            raise NotImplementedError
+
+        self.store_val = var_val
+        self.visit(node.target)
+
     def visit_Assign(self, node):
         self.store_val = self.visit(node.value)
         for n in node.targets:
