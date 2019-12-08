@@ -99,7 +99,7 @@ class Interpreter(StrictNodeVisitor):
         # across function boundaries (and that's how we have it - exception
         # would be caught in visit_Try, while re-rasing would happen in
         # visit_Raise).
-        self.cur_exc = None
+        self.cur_exc = []
 
     def stmt_list_visit(self, lst):
         res = None
@@ -210,18 +210,20 @@ class Interpreter(StrictNodeVisitor):
         except TargetNonlocalFlow:
             raise
         except Exception as e:
-            self.cur_exc = e
-            for h in node.handlers:
-                if h.type is None or isinstance(e, self.visit(h.type)):
-                    if h.name:
-                        self.ns[h.name] = e
-                    self.stmt_list_visit(h.body)
-                    if h.name:
-                        del self.ns[h.name]
-                    self.cur_exc = None
-                    break
-            else:
-                raise
+            self.cur_exc.append(e)
+            try:
+                for h in node.handlers:
+                    if h.type is None or isinstance(e, self.visit(h.type)):
+                        if h.name:
+                            self.ns[h.name] = e
+                        self.stmt_list_visit(h.body)
+                        if h.name:
+                            del self.ns[h.name]
+                        break
+                else:
+                    raise
+            finally:
+                self.cur_exc.pop()
         else:
             self.stmt_list_visit(node.orelse)
         finally:
@@ -278,7 +280,9 @@ class Interpreter(StrictNodeVisitor):
 
     def visit_Raise(self, node):
         if node.exc is None:
-            raise self.cur_exc
+            if not self.cur_exc:
+                raise RuntimeError("No active exception to reraise")
+            raise self.cur_exc[-1]
         if node.cause is None:
             raise self.visit(node.exc)
         else:
