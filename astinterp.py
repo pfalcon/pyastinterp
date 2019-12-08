@@ -57,6 +57,9 @@ class TargetBreak(TargetNonlocalFlow):
 class TargetContinue(TargetNonlocalFlow):
     pass
 
+class TargetReturn(TargetNonlocalFlow):
+    pass
+
 
 class InterpFunc:
     "Callable wrapper for AST functions (FunctionDef nodes)."
@@ -181,6 +184,8 @@ class Interpreter(StrictNodeVisitor):
         try:
             self.prepare_func_args(node, *args, **kwargs)
             res = self.stmt_list_visit(node.body)
+        except TargetReturn as e:
+            res = e.args[0]
         finally:
             self.ns = self.ns_stack.pop()
         return res
@@ -188,7 +193,7 @@ class Interpreter(StrictNodeVisitor):
     def visit_Return(self, node):
         if not self.ns_stack:
             raise SyntaxError("'return' outside function")
-        return node.value and self.visit(node.value)
+        raise TargetReturn(node.value and self.visit(node.value))
 
     def visit_Try(self, node):
         try:
