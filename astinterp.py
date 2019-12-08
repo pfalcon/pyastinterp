@@ -427,6 +427,9 @@ class Interpreter(StrictNodeVisitor):
     def visit_Str(self, node):
         return node.s
 
+    def visit_Bytes(self, node):
+        return node.s
+
     def visit_Num(self, node):
         return node.n
 
