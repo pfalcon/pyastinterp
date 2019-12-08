@@ -116,6 +116,11 @@ class Interpreter(StrictNodeVisitor):
         for n in node.names:
             self.ns[n.asname or n.name] = __import__(n.name)
 
+    def visit_ImportFrom(self, node):
+        mod = __import__(node.module, None, None, [n.name for n in node.names], node.level)
+        for n in node.names:
+            self.ns[n.asname or n.name] = getattr(mod, n.name)
+
     def visit_Raise(self, node):
         if node.cause is None:
             raise self.visit(node.exc)
