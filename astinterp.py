@@ -388,6 +388,9 @@ class Interpreter(StrictNodeVisitor):
         if isinstance(node.ctx, ast.Load):
             if node.id in self.ns:
                 return self.ns[node.id]
+            for ns in reversed(self.ns_stack):
+                if node.id in ns:
+                    return ns[node.id]
             try:
                 return getattr(builtins, node.id)
             except AttributeError:
