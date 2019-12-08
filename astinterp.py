@@ -258,6 +258,9 @@ class Interpreter(StrictNodeVisitor):
         else:
             raise NotImplementedError
 
+    def visit_Dict(self, node):
+        return {self.visit(p[0]): self.visit(p[1]) for p in zip(node.keys, node.values)}
+
     def visit_List(self, node):
         return [self.visit(e) for e in node.elts]
 
