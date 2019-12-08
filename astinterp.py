@@ -61,6 +61,15 @@ class TargetReturn(TargetNonlocalFlow):
     pass
 
 
+class VarScopeSentinel:
+
+    def __init__(self, name):
+        self.name = name
+
+NO_VAR = VarScopeSentinel("no_var")
+GLOBAL = VarScopeSentinel("global")
+
+
 class InterpFunc:
     "Callable wrapper for AST functions (FunctionDef nodes)."
 
@@ -439,13 +448,29 @@ class Interpreter(StrictNodeVisitor):
         else:
             raise NotImplementedError
 
+    def visit_Global(self, node):
+        for n in node.names:
+            if n in self.ns and self.ns[n] is not GLOBAL:
+                raise SyntaxError("SyntaxError: name '{}' is assigned to before global declaration".format(n))
+            if self.ns_stack:
+                self.ns[n] = GLOBAL
+
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
+            res = NO_VAR
             if node.id in self.ns:
-                return self.ns[node.id]
-            for ns in reversed(self.ns_stack):
-                if node.id in ns:
-                    return ns[node.id]
+                res = self.ns[node.id]
+            else:
+                for ns in reversed(self.ns_stack):
+                    if node.id in ns:
+                        res = ns[node.id]
+                        break
+
+            if res is GLOBAL:
+                res = self.ns_stack[0].get(node.id, NO_VAR)
+            if res is not NO_VAR:
+                return res
+
             try:
                 return getattr(builtins, node.id)
             except AttributeError:
