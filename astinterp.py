@@ -312,6 +312,9 @@ class Interpreter(StrictNodeVisitor):
         for n in node.targets:
             self.visit(n)
 
+    def visit_Pass(self, node):
+        pass
+
     def visit_Expr(self, node):
         # Produced value is ignored
         self.visit(node.value)
