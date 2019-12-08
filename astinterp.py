@@ -180,6 +180,27 @@ class Interpreter(StrictNodeVisitor):
         kwargs = {kw.arg: self.visit(kw.value) for kw in node.keywords}
         return func(*args, **kwargs)
 
+    def visit_Compare(self, node):
+        cmpop_map = {
+            ast.Eq: lambda x, y: x == y,
+            ast.NotEq: lambda x, y: x != y,
+            ast.Lt: lambda x, y: x < y,
+            ast.LtE: lambda x, y: x <= y,
+            ast.Gt: lambda x, y: x > y,
+            ast.GtE: lambda x, y: x >= y,
+            ast.Is: lambda x, y: x is y,
+            ast.IsNot: lambda x, y: x is not y,
+            ast.In: lambda x, y: x in y,
+            ast.NotIn: lambda x, y: x not in y,
+        }
+        lv = self.visit(node.left)
+        for op, r in zip(node.ops, node.comparators):
+            rv = self.visit(r)
+            if not cmpop_map[type(op)](lv, rv):
+                return False
+            lv = rv
+        return True
+
     def visit_BoolOp(self, node):
         if isinstance(node.op, ast.And):
             res = True
