@@ -46,10 +46,22 @@ class SliceGetter:
 slice_getter = SliceGetter()
 
 
+class InterpFunc:
+    "Callable wrapper for AST functions (FunctionDef nodes)."
+
+    def __init__(self, node, interp):
+        self.node = node
+        self.interp = interp
+
+    def __call__(self, *args, **kwargs):
+        return self.interp.call_func(self.node, *args, **kwargs)
+
+
 class Interpreter(StrictNodeVisitor):
 
     def __init__(self):
         self.ns = {}
+        self.ns_stack = []
         # To implement "store" operation, we need to arguments: location and
         # value to store. The operation itself is handled by a node visitor
         # (e.g. visit_Name), and location is represented by AST node, but
@@ -69,6 +81,90 @@ class Interpreter(StrictNodeVisitor):
 
     def visit_Expression(self, node):
         return self.visit(node.body)
+
+    def visit_FunctionDef(self, node):
+        # Defaults are evaluated at function definition time, so we
+        # need to do that now.
+        self.prepare_func(node)
+        self.ns[node.name] = InterpFunc(node, self)
+
+    def prepare_func(self, node):
+        """Prepare function AST node for future interpretation: pre-calculate
+        and cache useful information, etc."""
+        args = node.args
+        num_required = len(args.args) - len(args.defaults)
+        all_args = set()
+        d = {}
+        for i, a in enumerate(args.args):
+            all_args.add(a.arg)
+            if i >= num_required:
+                d[a.arg] = self.visit(args.defaults[i - num_required])
+        for a, v in zip(args.kwonlyargs, args.kw_defaults):
+            all_args.add(a.arg)
+            if v is not None:
+                d[a.arg] = self.visit(v)
+        node.args.defaults_dict = d
+        node.args.all_args = all_args
+
+    def prepare_func_args(self, node, *args, **kwargs):
+
+        def arg_num_mismatch():
+            raise TypeError("{}() takes {} positional arguments but {} were given".format(node.name, len(argspec.args), len(args)))
+
+        argspec = node.args
+
+        # If there's vararg, either offload surplus of args to it, or init
+        # it to empty tuple (all in one statement). If no vararg, error on
+        # too many args.
+        if argspec.vararg:
+            self.ns[argspec.vararg.arg] = args[len(argspec.args):]
+        else:
+            if len(args) > len(argspec.args):
+                arg_num_mismatch()
+
+        for i in range(min(len(args), len(argspec.args))):
+            self.ns[argspec.args[i].arg] = args[i]
+
+        # Process incoming keyword arguments, putting them in namespace if
+        # actual arg exists by that name, or offload to function's kwarg
+        # if any. All make needed checks and error out.
+        func_kwarg = {}
+        for k, v in kwargs.items():
+            if k in argspec.all_args:
+                if k in self.ns:
+                    raise TypeError("{}() got multiple values for argument '{}'".format(node.name, k))
+                self.ns[k] = v
+            elif argspec.kwarg:
+                func_kwarg[k] = v
+            else:
+                raise TypeError("{}() got an unexpected keyword argument '{}'".format(node.name, k))
+        if argspec.kwarg:
+            self.ns[argspec.kwarg.arg] = func_kwarg
+
+        # Finally, overlay default values for arguments not yet initialized.
+        # We need to do this last for "multiple values for the same arg"
+        # check to work.
+        for k, v in argspec.defaults_dict.items():
+            if k not in self.ns:
+                self.ns[k] = v
+
+        # And now go thru and check for any missing arguments.
+        for a in argspec.args:
+            if a.arg not in self.ns:
+                raise TypeError("{}() missing required positional argument: '{}'".format(node.name, a.arg))
+        for a in argspec.kwonlyargs:
+            if a.arg not in self.ns:
+                raise TypeError("{}() missing required keyword-only argument: '{}'".format(node.name, a.arg))
+
+    def call_func(self, node, *args, **kwargs):
+        self.ns_stack.append(self.ns)
+        self.ns = {}
+        try:
+            self.prepare_func_args(node, *args, **kwargs)
+            res = self.stmt_list_visit(node.body)
+        finally:
+            self.ns = self.ns_stack.pop()
+        return res
 
     def visit_Try(self, node):
         try:
