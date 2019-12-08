@@ -46,6 +46,18 @@ class SliceGetter:
 slice_getter = SliceGetter()
 
 
+class TargetNonlocalFlow(Exception):
+    """Base exception class to simulate non-local control flow transfers in
+    a target application."""
+    pass
+
+class TargetBreak(TargetNonlocalFlow):
+    pass
+
+class TargetContinue(TargetNonlocalFlow):
+    pass
+
+
 class InterpFunc:
     "Callable wrapper for AST functions (FunctionDef nodes)."
 
@@ -198,15 +210,31 @@ class Interpreter(StrictNodeVisitor):
         for item in iter:
             self.store_val = item
             self.visit(node.target)
-            self.stmt_list_visit(node.body)
+            try:
+                self.stmt_list_visit(node.body)
+            except TargetBreak:
+                break
+            except TargetContinue:
+                continue
         else:
             self.stmt_list_visit(node.orelse)
 
     def visit_While(self, node):
         while self.visit(node.test):
-            self.stmt_list_visit(node.body)
+            try:
+                self.stmt_list_visit(node.body)
+            except TargetBreak:
+                break
+            except TargetContinue:
+                continue
         else:
             self.stmt_list_visit(node.orelse)
+
+    def visit_Break(self, node):
+        raise TargetBreak
+
+    def visit_Continue(self, node):
+        raise TargetContinue
 
     def visit_If(self, node):
         test = self.visit(node.test)
