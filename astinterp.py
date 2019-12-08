@@ -73,8 +73,10 @@ class Interpreter(StrictNodeVisitor):
         self.store_val = None
 
     def stmt_list_visit(self, lst):
+        res = None
         for s in lst:
-            self.visit(s)
+            res = self.visit(s)
+        return res
 
     def visit_Module(self, node):
         self.stmt_list_visit(node.body)
@@ -165,6 +167,11 @@ class Interpreter(StrictNodeVisitor):
         finally:
             self.ns = self.ns_stack.pop()
         return res
+
+    def visit_Return(self, node):
+        if not self.ns_stack:
+            raise SyntaxError("'return' outside function")
+        return node.value and self.visit(node.value)
 
     def visit_Try(self, node):
         try:
