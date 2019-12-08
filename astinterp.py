@@ -193,7 +193,6 @@ class Interpreter(StrictNodeVisitor):
     def visit_Try(self, node):
         try:
             self.stmt_list_visit(node.body)
-            self.stmt_list_visit(node.finalbody)
         except Exception as e:
             self.cur_exc = e
             for h in node.handlers:
@@ -204,11 +203,13 @@ class Interpreter(StrictNodeVisitor):
                     if h.name:
                         del self.ns[h.name]
                     self.cur_exc = None
-                    self.stmt_list_visit(node.finalbody)
                     break
             else:
-                self.stmt_list_visit(node.finalbody)
                 raise
+        else:
+            self.stmt_list_visit(node.orelse)
+        finally:
+            self.stmt_list_visit(node.finalbody)
         # Could use "finally:" here to not repeat
         # stmt_list_visit(node.finalbody) 3 times
 
