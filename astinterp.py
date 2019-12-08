@@ -99,6 +99,12 @@ class Interpreter(StrictNodeVisitor):
         else:
             self.stmt_list_visit(node.orelse)
 
+    def visit_While(self, node):
+        while self.visit(node.test):
+            self.stmt_list_visit(node.body)
+        else:
+            self.stmt_list_visit(node.orelse)
+
     def visit_If(self, node):
         test = self.visit(node.test)
         if test:
