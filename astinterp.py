@@ -180,6 +180,19 @@ class Interpreter(StrictNodeVisitor):
         kwargs = {kw.arg: self.visit(kw.value) for kw in node.keywords}
         return func(*args, **kwargs)
 
+    def visit_BoolOp(self, node):
+        if isinstance(node.op, ast.And):
+            res = True
+            for v in node.values:
+                res = res and self.visit(v)
+        elif isinstance(node.op, ast.Or):
+            res = False
+            for v in node.values:
+                res = res or self.visit(v)
+        else:
+            raise NotImplementedError
+        return res
+
     def visit_BinOp(self, node):
         binop_map = {
             ast.Add: lambda x, y: x + y,
