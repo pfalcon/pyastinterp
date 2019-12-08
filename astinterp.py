@@ -83,6 +83,11 @@ class Interpreter(StrictNodeVisitor):
         # store this value as field. As interpretation happens sequentially,
         # there's no risk that it will be overwritten "concurrently".
         self.store_val = None
+        # Current active exception, for bare "raise", which doesn't work
+        # across function boundaries (and that's how we have it - exception
+        # would be caught in visit_Try, while re-rasing would happen in
+        # visit_Raise).
+        self.cur_exc = None
 
     def stmt_list_visit(self, lst):
         res = None
@@ -190,6 +195,7 @@ class Interpreter(StrictNodeVisitor):
             self.stmt_list_visit(node.body)
             self.stmt_list_visit(node.finalbody)
         except Exception as e:
+            self.cur_exc = e
             for h in node.handlers:
                 if h.type is None or isinstance(e, self.visit(h.type)):
                     if h.name:
@@ -197,6 +203,7 @@ class Interpreter(StrictNodeVisitor):
                     self.stmt_list_visit(h.body)
                     if h.name:
                         del self.ns[h.name]
+                    self.cur_exc = None
                     self.stmt_list_visit(node.finalbody)
                     break
             else:
@@ -253,6 +260,8 @@ class Interpreter(StrictNodeVisitor):
             self.ns[n.asname or n.name] = getattr(mod, n.name)
 
     def visit_Raise(self, node):
+        if node.exc is None:
+            raise self.cur_exc
         if node.cause is None:
             raise self.visit(node.exc)
         else:
