@@ -359,6 +359,12 @@ class Interpreter(StrictNodeVisitor):
         # Produced value is ignored
         self.visit(node.value)
 
+    def visit_IfExp(self, node):
+        if self.visit(node.test):
+            return self.visit(node.body)
+        else:
+            return self.visit(node.orelse)
+
     def visit_Call(self, node):
         func = self.visit(node.func)
         args = [self.visit(a) for a in node.args]
