@@ -476,9 +476,19 @@ class Interpreter(StrictNodeVisitor):
             except AttributeError:
                 raise NameError("name '{}' is not defined".format(node.id))
         elif isinstance(node.ctx, ast.Store):
-            self.ns[node.id] = self.store_val
+            res = self.ns.get(node.id, NO_VAR)
+            if res is GLOBAL:
+                self.ns_stack[0][node.id] = self.store_val
+            else:
+                self.ns[node.id] = self.store_val
         elif isinstance(node.ctx, ast.Del):
-            del self.ns[node.id]
+            res = self.ns.get(node.id, NO_VAR)
+            if res is NO_VAR:
+                raise NameError("name '{}' is not defined".format(node.id))
+            elif res is GLOBAL:
+                del self.ns_stack[0][node.id]
+            else:
+                del self.ns[node.id]
         else:
             raise NotImplementedError
 
