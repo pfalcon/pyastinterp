@@ -338,6 +338,10 @@ class Interpreter(StrictNodeVisitor):
         for n in node.targets:
             self.visit(n)
 
+    def visit_Delete(self, node):
+        for n in node.targets:
+            self.visit(n)
+
     def visit_Pass(self, node):
         pass
 
