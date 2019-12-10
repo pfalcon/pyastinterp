@@ -406,6 +406,26 @@ class Interpreter(StrictNodeVisitor):
         finally:
             self.pop_ns()
 
+    def visit_SetComp(self, node):
+        self.push_ns()
+        try:
+            return {
+                self.visit(node.elt)
+                for _ in self.enumerate_comps(node.generators)
+            }
+        finally:
+            self.pop_ns()
+
+    def visit_DictComp(self, node):
+        self.push_ns()
+        try:
+            return {
+                self.visit(node.key): self.visit(node.value)
+                for _ in self.enumerate_comps(node.generators)
+            }
+        finally:
+            self.pop_ns()
+
     def visit_IfExp(self, node):
         if self.visit(node.test):
             return self.visit(node.body)
