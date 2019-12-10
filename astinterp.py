@@ -367,6 +367,28 @@ class Interpreter(StrictNodeVisitor):
         # Produced value is ignored
         self.visit(node.value)
 
+    def visit_ListComp(self, node):
+        assert len(node.generators) == 1
+        iter = self.visit(node.generators[0].iter)
+        res = []
+        self.ns_stack.append(self.ns)
+        self.ns = {}
+        try:
+            for el in iter:
+                self.store_val = el
+                self.visit(node.generators[0].target)
+                val = self.visit(node.elt)
+                gate = True
+                for cond in node.generators[0].ifs:
+                    gate = self.visit(cond)
+                    if not gate:
+                        break
+                if gate:
+                    res.append(val)
+        finally:
+            self.ns = self.ns_stack.pop()
+        return res
+
     def visit_IfExp(self, node):
         if self.visit(node.test):
             return self.visit(node.body)
