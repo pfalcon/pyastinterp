@@ -373,27 +373,38 @@ class Interpreter(StrictNodeVisitor):
         # Produced value is ignored
         self.visit(node.value)
 
+    def enumerate_comps(self, iters):
+        """Enumerate thru all possible values of comprehension clauses,
+        including multiple "for" clauses, each optionally associated
+        with multiple "if" clauses. Current result of the enumeration
+        is stored in the namespace."""
+
+        def eval_ifs(iter):
+            """Evaluate all "if" clauses."""
+            for cond in iter.ifs:
+                if not self.visit(cond):
+                    return False
+            return True
+
+        if not iters:
+            yield
+            return
+        for el in self.visit(iters[0].iter):
+            self.store_val = el
+            self.visit(iters[0].target)
+            for t in self.enumerate_comps(iters[1:]):
+                if eval_ifs(iters[0]):
+                    yield
+
     def visit_ListComp(self, node):
-        assert len(node.generators) == 1
-        iter = self.visit(node.generators[0].iter)
-        res = []
-        self.ns_stack.append(self.ns)
-        self.ns = {}
+        self.push_ns()
         try:
-            for el in iter:
-                self.store_val = el
-                self.visit(node.generators[0].target)
-                val = self.visit(node.elt)
-                gate = True
-                for cond in node.generators[0].ifs:
-                    gate = self.visit(cond)
-                    if not gate:
-                        break
-                if gate:
-                    res.append(val)
+            return [
+                self.visit(node.elt)
+                for _ in self.enumerate_comps(node.generators)
+            ]
         finally:
-            self.ns = self.ns_stack.pop()
-        return res
+            self.pop_ns()
 
     def visit_IfExp(self, node):
         if self.visit(node.test):
