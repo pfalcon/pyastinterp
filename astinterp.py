@@ -113,6 +113,11 @@ class Interpreter(StrictNodeVisitor):
     def visit_Expression(self, node):
         return self.visit(node.body)
 
+    def visit_Lambda(self, node):
+        node.name = "<lambda>"
+        self.prepare_func(node)
+        return InterpFunc(node, self)
+
     def visit_FunctionDef(self, node):
         # Defaults are evaluated at function definition time, so we
         # need to do that now.
@@ -192,7 +197,10 @@ class Interpreter(StrictNodeVisitor):
         self.ns = {}
         try:
             self.prepare_func_args(node, *args, **kwargs)
-            res = self.stmt_list_visit(node.body)
+            if isinstance(node.body, list):
+                res = self.stmt_list_visit(node.body)
+            else:
+                res = self.visit(node.body)
         except TargetReturn as e:
             res = e.args[0]
         finally:
