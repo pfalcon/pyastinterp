@@ -101,6 +101,13 @@ class Interpreter(StrictNodeVisitor):
         # visit_Raise).
         self.cur_exc = []
 
+    def push_ns(self):
+        self.ns_stack.append(self.ns)
+        self.ns = {}
+
+    def pop_ns(self):
+        self.ns = self.ns_stack.pop()
+
     def stmt_list_visit(self, lst):
         res = None
         for s in lst:
@@ -193,8 +200,7 @@ class Interpreter(StrictNodeVisitor):
                 raise TypeError("{}() missing required keyword-only argument: '{}'".format(node.name, a.arg))
 
     def call_func(self, node, *args, **kwargs):
-        self.ns_stack.append(self.ns)
-        self.ns = {}
+        self.push_ns()
         try:
             self.prepare_func_args(node, *args, **kwargs)
             if isinstance(node.body, list):
@@ -204,7 +210,7 @@ class Interpreter(StrictNodeVisitor):
         except TargetReturn as e:
             res = e.args[0]
         finally:
-            self.ns = self.ns_stack.pop()
+            self.pop_ns()
         return res
 
     def visit_Return(self, node):
