@@ -132,6 +132,12 @@ class Interpreter(StrictNodeVisitor):
             res = self.visit(s)
         return res
 
+    def wrap_decorators(self, obj, node):
+        for deco_n in reversed(node.decorator_list):
+            deco = self.visit(deco_n)
+            obj = deco(obj)
+        return obj
+
     def visit_Module(self, node):
         self.stmt_list_visit(node.body)
 
@@ -158,7 +164,9 @@ class Interpreter(StrictNodeVisitor):
         # Defaults are evaluated at function definition time, so we
         # need to do that now.
         self.prepare_func(node)
-        self.ns[node.name] = InterpFunc(node, self)
+        func = InterpFunc(node, self)
+        func = self.wrap_decorators(func, node)
+        self.ns[node.name] = func
 
     def prepare_func(self, node):
         """Prepare function AST node for future interpretation: pre-calculate
