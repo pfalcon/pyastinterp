@@ -70,7 +70,7 @@ NO_VAR = VarScopeSentinel("no_var")
 GLOBAL = VarScopeSentinel("global")
 
 
-class InterpFunc:
+class InterpFuncWrap:
     "Callable wrapper for AST functions (FunctionDef nodes)."
 
     def __init__(self, node, interp):
@@ -79,6 +79,24 @@ class InterpFunc:
 
     def __call__(self, *args, **kwargs):
         return self.interp.call_func(self.node, *args, **kwargs)
+
+
+# Python don't fully treat objects, even those defining __call__() special
+# method, as a true callable. For example, such objects aren't automatically
+# converted to bound methods if looked up as another object's attributes.
+# As we want our "interpreted functions" to behave as close as possible to
+# real functions, we just wrap function object with a real function. An
+# alternative might have been to perform needed checks and explicitly
+# bind a method using types.MethodType() in visit_Attribute (but then maybe
+# there would be still other cases of "callable object" vs "function"
+# discrepancies).
+def InterpFunc(node, interp):
+    fun = InterpFuncWrap(node, interp)
+
+    def func(*args, **kwargs):
+        return fun.__call__(*args, **kwargs)
+
+    return func
 
 
 class Interpreter(StrictNodeVisitor):
@@ -119,6 +137,17 @@ class Interpreter(StrictNodeVisitor):
 
     def visit_Expression(self, node):
         return self.visit(node.body)
+
+    def visit_ClassDef(self, node):
+        self.push_ns()
+        try:
+            self.stmt_list_visit(node.body)
+        except:
+            self.pop_ns()
+            raise
+        ns = self.ns
+        self.pop_ns()
+        self.ns[node.name] = type(node.name, tuple([self.visit(b) for b in node.bases]), ns)
 
     def visit_Lambda(self, node):
         node.name = "<lambda>"
