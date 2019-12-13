@@ -140,6 +140,8 @@ class Interpreter(StrictNodeVisitor):
     def __init__(self):
         self.ns = None
         self.ns_stack = []
+        # Call stack (in terms of function AST nodes).
+        self.call_stack = []
         # To implement "store" operation, we need to arguments: location and
         # value to store. The operation itself is handled by a node visitor
         # (e.g. visit_Name), and location is represented by AST node, but
@@ -277,6 +279,7 @@ class Interpreter(StrictNodeVisitor):
                 raise TypeError("{}() missing required keyword-only argument: '{}'".format(node.name, a.arg))
 
     def call_func(self, node, *args, **kwargs):
+        self.call_stack.append(node)
         self.push_ns(FunctionNS(node))
         try:
             self.prepare_func_args(node, *args, **kwargs)
@@ -288,6 +291,7 @@ class Interpreter(StrictNodeVisitor):
             res = e.args[0]
         finally:
             self.pop_ns()
+            self.call_stack.pop()
         return res
 
     def visit_Return(self, node):
