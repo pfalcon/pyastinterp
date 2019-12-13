@@ -153,7 +153,9 @@ class Interpreter(StrictNodeVisitor):
             raise
         ns = self.ns
         self.pop_ns()
-        self.ns[node.name] = type(node.name, tuple([self.visit(b) for b in node.bases]), ns)
+        cls = type(node.name, tuple([self.visit(b) for b in node.bases]), ns)
+        cls = self.wrap_decorators(cls, node)
+        self.ns[node.name] = cls
 
     def visit_Lambda(self, node):
         node.name = "<lambda>"
