@@ -36,6 +36,42 @@ class StrictNodeVisitor(ast.NodeVisitor):
         raise NotImplementedError("Visitor for node {} not implemented".format(n))
 
 
+class ANamespace:
+
+    def __init__(self, node):
+        self.d = {}
+        self.parent = None
+        # Cross-link namespace to AST node. Note that we can't do the
+        # opposite, because for one node, there can be different namespaces.
+        self.node = node
+
+    def __getitem__(self, k):
+        return self.d[k]
+
+    def get(self, k, default=None):
+        return self.d.get(k, default)
+
+    def __setitem__(self, k, v):
+        self.d[k] = v
+
+    def __delitem__(self, k):
+        del self.d[k]
+
+    def __contains__(self, k):
+        return k in self.d
+
+    def __str__(self):
+        return "<{} {}>".format(self.__class__.__name__, self.d)
+
+
+class ModuleNS(ANamespace):
+    pass
+class FunctionNS(ANamespace):
+    pass
+class ClassNS(ANamespace):
+    pass
+
+
 # Pycopy by default doesn't support direct slice construction, use helper
 # object to construct it.
 class SliceGetter:
@@ -102,7 +138,7 @@ def InterpFunc(node, interp):
 class Interpreter(StrictNodeVisitor):
 
     def __init__(self):
-        self.ns = {}
+        self.ns = None
         self.ns_stack = []
         # To implement "store" operation, we need to arguments: location and
         # value to store. The operation itself is handled by a node visitor
@@ -119,9 +155,10 @@ class Interpreter(StrictNodeVisitor):
         # visit_Raise).
         self.cur_exc = []
 
-    def push_ns(self):
+    def push_ns(self, new_ns):
+        new_ns.parent = self.ns
         self.ns_stack.append(self.ns)
-        self.ns = {}
+        self.ns = new_ns
 
     def pop_ns(self):
         self.ns = self.ns_stack.pop()
@@ -139,13 +176,14 @@ class Interpreter(StrictNodeVisitor):
         return obj
 
     def visit_Module(self, node):
+        self.ns = ModuleNS(node)
         self.stmt_list_visit(node.body)
 
     def visit_Expression(self, node):
         return self.visit(node.body)
 
     def visit_ClassDef(self, node):
-        self.push_ns()
+        self.push_ns(ClassNS(node))
         try:
             self.stmt_list_visit(node.body)
         except:
@@ -153,7 +191,7 @@ class Interpreter(StrictNodeVisitor):
             raise
         ns = self.ns
         self.pop_ns()
-        cls = type(node.name, tuple([self.visit(b) for b in node.bases]), ns)
+        cls = type(node.name, tuple([self.visit(b) for b in node.bases]), ns.d)
         cls = self.wrap_decorators(cls, node)
         self.ns[node.name] = cls
 
@@ -239,7 +277,7 @@ class Interpreter(StrictNodeVisitor):
                 raise TypeError("{}() missing required keyword-only argument: '{}'".format(node.name, a.arg))
 
     def call_func(self, node, *args, **kwargs):
-        self.push_ns()
+        self.push_ns(FunctionNS(node))
         try:
             self.prepare_func_args(node, *args, **kwargs)
             if isinstance(node.body, list):
@@ -436,7 +474,7 @@ class Interpreter(StrictNodeVisitor):
                     yield
 
     def visit_ListComp(self, node):
-        self.push_ns()
+        self.push_ns(FunctionNS(node))
         try:
             return [
                 self.visit(node.elt)
@@ -446,7 +484,7 @@ class Interpreter(StrictNodeVisitor):
             self.pop_ns()
 
     def visit_SetComp(self, node):
-        self.push_ns()
+        self.push_ns(FunctionNS(node))
         try:
             return {
                 self.visit(node.elt)
@@ -456,7 +494,7 @@ class Interpreter(StrictNodeVisitor):
             self.pop_ns()
 
     def visit_DictComp(self, node):
-        self.push_ns()
+        self.push_ns(FunctionNS(node))
         try:
             return {
                 self.visit(node.key): self.visit(node.value)
