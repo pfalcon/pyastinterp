@@ -345,6 +345,12 @@ class Interpreter(StrictNodeVisitor):
     def visit_Pass(self, node):
         pass
 
+    def visit_Assert(self, node):
+        if node.msg is None:
+            assert self.visit(node.test)
+        else:
+            assert self.visit(node.test), self.visit(node.msg)
+
     def visit_Expr(self, node):
         # Produced value is ignored
         self.visit(node.value)
