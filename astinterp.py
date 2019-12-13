@@ -196,6 +196,8 @@ class Interpreter(StrictNodeVisitor):
         cls = type(node.name, tuple([self.visit(b) for b in node.bases]), ns.d)
         cls = self.wrap_decorators(cls, node)
         self.ns[node.name] = cls
+        # Store reference to class object in the AST node
+        node.cls = cls
 
     def visit_Lambda(self, node):
         node.name = "<lambda>"
@@ -227,6 +229,13 @@ class Interpreter(StrictNodeVisitor):
                 d[a.arg] = self.visit(v)
         node.args.defaults_dict = d
         node.args.all_args = all_args
+
+        # Also, store a reference to containing class, to resolve super()
+        # without arguments later.
+        if isinstance(self.ns, ClassNS):
+            node.class_def = self.ns.node
+        else:
+            node.class_def = None
 
     def prepare_func_args(self, node, *args, **kwargs):
 
@@ -517,6 +526,19 @@ class Interpreter(StrictNodeVisitor):
         func = self.visit(node.func)
         args = [self.visit(a) for a in node.args]
         kwargs = {kw.arg: self.visit(kw.value) for kw in node.keywords}
+
+        if func is builtins.super and not args:
+            if not self.call_stack or not self.call_stack[-1].class_def:
+                raise RuntimeError("super(): no arguments")
+            # As we're creating methods dynamically outside of class, super()
+            # without argument won't work, as that requires __class__ cell.
+            # Creating that would be cumbersome (Pycopy definitely lacks
+            # enough introspection for that), so we substitute 2 implied
+            # args (which argumentless super() would take from cell and
+            # 1st arg to func). In our case, we take them from prepared
+            # bookkeeping info.
+            args = (self.call_stack[-1].class_def.cls, self.ns["self"])
+
         return func(*args, **kwargs)
 
     def visit_Compare(self, node):
