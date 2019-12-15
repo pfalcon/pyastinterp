@@ -556,7 +556,14 @@ class Interpreter(StrictNodeVisitor):
 
     def visit_Call(self, node):
         func = self.visit(node.func)
-        args = [self.visit(a) for a in node.args]
+
+        args = []
+        for a in node.args:
+            if isinstance(a, ast.Starred):
+                args.extend(self.visit(a.value))
+            else:
+                args.append(self.visit(a))
+
         kwargs = {}
         for kw in node.keywords:
             val = self.visit(kw.value)
