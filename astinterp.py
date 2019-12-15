@@ -557,7 +557,13 @@ class Interpreter(StrictNodeVisitor):
     def visit_Call(self, node):
         func = self.visit(node.func)
         args = [self.visit(a) for a in node.args]
-        kwargs = {kw.arg: self.visit(kw.value) for kw in node.keywords}
+        kwargs = {}
+        for kw in node.keywords:
+            val = self.visit(kw.value)
+            if kw.arg is None:
+                kwargs.update(val)
+            else:
+                kwargs[kw.arg] = val
 
         if func is builtins.super and not args:
             if not self.call_stack or not self.call_stack[-1].class_def:
