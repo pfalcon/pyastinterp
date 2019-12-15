@@ -139,7 +139,7 @@ class Interpreter(StrictNodeVisitor):
 
     def __init__(self):
         self.ns = None
-        self.ns_stack = []
+        self.module_ns = None
         # Call stack (in terms of function AST nodes).
         self.call_stack = []
         # To implement "store" operation, we need to arguments: location and
@@ -159,11 +159,10 @@ class Interpreter(StrictNodeVisitor):
 
     def push_ns(self, new_ns):
         new_ns.parent = self.ns
-        self.ns_stack.append(self.ns)
         self.ns = new_ns
 
     def pop_ns(self):
-        self.ns = self.ns_stack.pop()
+        self.ns = self.ns.parent
 
     def stmt_list_visit(self, lst):
         res = None
@@ -178,7 +177,7 @@ class Interpreter(StrictNodeVisitor):
         return obj
 
     def visit_Module(self, node):
-        self.ns = ModuleNS(node)
+        self.ns = self.module_ns = ModuleNS(node)
         self.stmt_list_visit(node.body)
 
     def visit_Expression(self, node):
@@ -304,7 +303,7 @@ class Interpreter(StrictNodeVisitor):
         return res
 
     def visit_Return(self, node):
-        if not self.ns_stack:
+        if not isinstance(self.ns, FunctionNS):
             raise SyntaxError("'return' outside function")
         raise TargetReturn(node.value and self.visit(node.value))
 
@@ -642,7 +641,8 @@ class Interpreter(StrictNodeVisitor):
         for n in node.names:
             if n in self.ns and self.ns[n] is not GLOBAL:
                 raise SyntaxError("SyntaxError: name '{}' is assigned to before global declaration".format(n))
-            if self.ns_stack:
+            # Don't store GLOBAL in the top-level namespace
+            if self.ns.parent:
                 self.ns[n] = GLOBAL
 
     def visit_Name(self, node):
@@ -656,7 +656,7 @@ class Interpreter(StrictNodeVisitor):
                 ns = ns.parent
 
             if res is GLOBAL:
-                res = self.ns_stack[0].get(node.id, NO_VAR)
+                res = self.module_ns.get(node.id, NO_VAR)
             if res is not NO_VAR:
                 return res
 
@@ -667,7 +667,7 @@ class Interpreter(StrictNodeVisitor):
         elif isinstance(node.ctx, ast.Store):
             res = self.ns.get(node.id, NO_VAR)
             if res is GLOBAL:
-                self.ns_stack[0][node.id] = self.store_val
+                self.module_ns[node.id] = self.store_val
             else:
                 self.ns[node.id] = self.store_val
         elif isinstance(node.ctx, ast.Del):
@@ -675,7 +675,7 @@ class Interpreter(StrictNodeVisitor):
             if res is NO_VAR:
                 raise NameError("name '{}' is not defined".format(node.id))
             elif res is GLOBAL:
-                del self.ns_stack[0][node.id]
+                del self.module_ns[node.id]
             else:
                 del self.ns[node.id]
         else:
