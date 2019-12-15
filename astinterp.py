@@ -193,6 +193,7 @@ class Interpreter(StrictNodeVisitor):
 
     def visit_Module(self, node):
         self.ns = self.module_ns = ModuleNS(node)
+        self.ns["__name__"] = "__main__"
         self.stmt_list_visit(node.body)
 
     def visit_Expression(self, node):
