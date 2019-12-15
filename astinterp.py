@@ -344,8 +344,7 @@ class Interpreter(StrictNodeVisitor):
     def visit_For(self, node):
         iter = self.visit(node.iter)
         for item in iter:
-            self.store_val = item
-            self.visit(node.target)
+            self.handle_assign(node.target, item)
             try:
                 self.stmt_list_visit(node.body)
             except TargetBreak:
