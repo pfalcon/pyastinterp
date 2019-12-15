@@ -314,6 +314,14 @@ class Interpreter(StrictNodeVisitor):
             raise SyntaxError("'return' outside function")
         raise TargetReturn(node.value and self.visit(node.value))
 
+    def visit_With(self, node):
+        assert len(node.items) == 1
+        ctx = self.visit(node.items[0].context_expr)
+        with ctx as val:
+            if node.items[0].optional_vars is not None:
+                self.handle_assign(node.items[0].optional_vars, val)
+            self.stmt_list_visit(node.body)
+
     def visit_Try(self, node):
         try:
             self.stmt_list_visit(node.body)
