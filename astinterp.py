@@ -649,11 +649,19 @@ class Interpreter(StrictNodeVisitor):
         if isinstance(node.ctx, ast.Load):
             res = NO_VAR
             ns = self.ns
+            # We always lookup in the current namespace (on the first
+            # iteration), but afterwards we always skip class namespaces.
+            # Or put it another way, class code can look up in its own
+            # namespace, but that's the only case when the class namespace
+            # is consulted.
+            skip_classes = False
             while ns:
-                res = ns.get(node.id, NO_VAR)
-                if res is not NO_VAR:
-                    break
+                if not (skip_classes and isinstance(ns, ClassNS)):
+                    res = ns.get(node.id, NO_VAR)
+                    if res is not NO_VAR:
+                        break
                 ns = ns.parent
+                skip_classes = True
 
             if res is GLOBAL:
                 res = self.module_ns.get(node.id, NO_VAR)
