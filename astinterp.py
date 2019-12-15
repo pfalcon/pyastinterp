@@ -791,5 +791,6 @@ if __name__ == "__main__":
     tree = ast.parse(open(sys.argv[1]).read())
     #print(ast.dump(tree))
 
+    sys.argv.pop(0)
     interp = Interpreter()
     interp.visit(tree)
