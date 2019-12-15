@@ -648,13 +648,12 @@ class Interpreter(StrictNodeVisitor):
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
             res = NO_VAR
-            if node.id in self.ns:
-                res = self.ns[node.id]
-            else:
-                for ns in reversed(self.ns_stack):
-                    if node.id in ns:
-                        res = ns[node.id]
-                        break
+            ns = self.ns
+            while ns:
+                res = ns.get(node.id, NO_VAR)
+                if res is not NO_VAR:
+                    break
+                ns = ns.parent
 
             if res is GLOBAL:
                 res = self.ns_stack[0].get(node.id, NO_VAR)
