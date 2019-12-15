@@ -448,9 +448,36 @@ class Interpreter(StrictNodeVisitor):
         self.visit(node.target)
 
     def visit_Assign(self, node):
-        self.store_val = self.visit(node.value)
+        val = self.visit(node.value)
         for n in node.targets:
-            self.visit(n)
+            self.handle_assign(n, val)
+
+    def handle_assign(self, target, val):
+        if isinstance(target, ast.Tuple):
+            it = iter(val)
+            try:
+                for elt_idx, t in enumerate(target.elts):
+                    if isinstance(t, ast.Starred):
+                        t = t.value
+                        all_elts = list(it)
+                        break_i = len(all_elts) - (len(target.elts) - elt_idx - 1)
+                        self.store_val = all_elts[:break_i]
+                        it = iter(all_elts[break_i:])
+                    else:
+                        self.store_val = next(it)
+                    self.visit(t)
+            except StopIteration:
+                raise ValueError("not enough values to unpack (expected {})".format(len(n.elts))) from None
+
+            try:
+                next(it)
+                raise ValueError("too many values to unpack (expected {})".format(len(n.elts)))
+            except StopIteration:
+                # Expected
+                pass
+        else:
+            self.store_val = val
+            self.visit(target)
 
     def visit_Delete(self, node):
         for n in node.targets:
