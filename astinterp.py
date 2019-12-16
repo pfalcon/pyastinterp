@@ -150,6 +150,21 @@ class InterpWith:
         return self.ctx.__exit__(tp, exc, tb)
 
 
+class InterpModule:
+
+    def __init__(self, ns):
+        self.ns = ns
+
+    def __getattr__(self, name):
+        try:
+            return self.ns[name]
+        except KeyError:
+            raise AttributeError
+
+    def __dir__(self):
+        return list(self.ns.d.keys())
+
+
 class Interpreter(StrictNodeVisitor):
 
     def __init__(self, fname):
@@ -196,6 +211,7 @@ class Interpreter(StrictNodeVisitor):
         self.ns = self.module_ns = ModuleNS(node)
         self.ns["__file__"] = self.fname
         self.ns["__name__"] = "__main__"
+        sys.modules["__main__"] = InterpModule(self.ns)
         self.stmt_list_visit(node.body)
 
     def visit_Expression(self, node):
