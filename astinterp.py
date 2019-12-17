@@ -135,6 +135,21 @@ def InterpFunc(node, interp):
     return func
 
 
+class InterpWith:
+
+    def __init__(self, ctx):
+        self.ctx = ctx
+
+    def __enter__(self):
+        return self.ctx.__enter__()
+
+    def __exit__(self, tp, exc, tb):
+        # Don't leak meta-level exceptions into target
+        if isinstance(exc, TargetNonlocalFlow):
+            tp = exc = tb = None
+        return self.ctx.__exit__(tp, exc, tb)
+
+
 class Interpreter(StrictNodeVisitor):
 
     def __init__(self):
@@ -317,7 +332,7 @@ class Interpreter(StrictNodeVisitor):
     def visit_With(self, node):
         assert len(node.items) == 1
         ctx = self.visit(node.items[0].context_expr)
-        with ctx as val:
+        with InterpWith(ctx) as val:
             if node.items[0].optional_vars is not None:
                 self.handle_assign(node.items[0].optional_vars, val)
             self.stmt_list_visit(node.body)
