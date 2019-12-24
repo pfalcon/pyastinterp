@@ -148,6 +148,9 @@ class Interpreter(StrictNodeVisitor):
     def visit_NameConstant(self, node):
         return node.value
 
+    def visit_Ellipsis(self, node):
+        return ...
+
     def visit_Str(self, node):
         return node.s
 
