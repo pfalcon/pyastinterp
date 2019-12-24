@@ -112,9 +112,10 @@ class InterpFuncWrap:
     def __init__(self, node, interp):
         self.node = node
         self.interp = interp
+        self.lexical_scope = interp.ns
 
     def __call__(self, *args, **kwargs):
-        return self.interp.call_func(self.node, *args, **kwargs)
+        return self.interp.call_func(self.node, self, *args, **kwargs)
 
 
 # Python don't fully treat objects, even those defining __call__() special
@@ -269,8 +270,6 @@ class Interpreter(StrictNodeVisitor):
             node.class_def = self.ns.node
         else:
             node.class_def = None
-        # Finally, store lexical scope stack
-        node.lexical_scope = self.ns
 
     def prepare_func_args(self, node, *args, **kwargs):
 
@@ -322,12 +321,12 @@ class Interpreter(StrictNodeVisitor):
             if a.arg not in self.ns:
                 raise TypeError("{}() missing required keyword-only argument: '{}'".format(node.name, a.arg))
 
-    def call_func(self, node, *args, **kwargs):
+    def call_func(self, node, interp_func, *args, **kwargs):
         self.call_stack.append(node)
         # We need to switch from dynamic execution scope to lexical scope
         # in which function was defined (then switch back on return).
         dyna_scope = self.ns
-        self.ns = node.lexical_scope
+        self.ns = interp_func.lexical_scope
         self.push_ns(FunctionNS(node))
         try:
             self.prepare_func_args(node, *args, **kwargs)
