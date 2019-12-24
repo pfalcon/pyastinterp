@@ -104,6 +104,7 @@ class VarScopeSentinel:
 
 NO_VAR = VarScopeSentinel("no_var")
 GLOBAL = VarScopeSentinel("global")
+NONLOCAL = VarScopeSentinel("nonlocal")
 
 
 class InterpFuncWrap:
@@ -729,6 +730,25 @@ class Interpreter(StrictNodeVisitor):
             if self.ns.parent:
                 self.ns[n] = GLOBAL
 
+    def visit_Nonlocal(self, node):
+        if isinstance(self.ns, ModuleNS):
+            raise SyntaxError("nonlocal declaration not allowed at module level")
+        for n in node.names:
+            self.ns[n] = NONLOCAL
+
+    @staticmethod
+    def resolve_nonlocal(id, ns):
+        while ns:
+            res = ns.get(id, NO_VAR)
+            if res is GLOBAL:
+                return self.module_ns
+            if res is not NO_VAR and res is not NONLOCAL:
+                if isinstance(ns, ModuleNS):
+                    break
+                return ns
+            ns = ns.parent
+        raise SyntaxError("no binding for nonlocal '{}' found".format(id))
+
     def visit_Name(self, node):
         if isinstance(node.ctx, ast.Load):
             res = NO_VAR
@@ -747,6 +767,9 @@ class Interpreter(StrictNodeVisitor):
                 ns = ns.parent
                 skip_classes = True
 
+            if res is NONLOCAL:
+                ns = self.resolve_nonlocal(node.id, ns.parent)
+                return ns[node.id]
             if res is GLOBAL:
                 res = self.module_ns.get(node.id, NO_VAR)
             if res is not NO_VAR:
@@ -760,6 +783,9 @@ class Interpreter(StrictNodeVisitor):
             res = self.ns.get(node.id, NO_VAR)
             if res is GLOBAL:
                 self.module_ns[node.id] = self.store_val
+            elif res is NONLOCAL:
+                ns = self.resolve_nonlocal(node.id, self.ns.parent)
+                ns[node.id] = self.store_val
             else:
                 self.ns[node.id] = self.store_val
         elif isinstance(node.ctx, ast.Del):
@@ -768,6 +794,9 @@ class Interpreter(StrictNodeVisitor):
                 raise NameError("name '{}' is not defined".format(node.id))
             elif res is GLOBAL:
                 del self.module_ns[node.id]
+            elif res is NONLOCAL:
+                ns = self.resolve_nonlocal(node.id, self.ns.parent)
+                del ns[node.id]
             else:
                 del self.ns[node.id]
         else:
