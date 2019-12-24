@@ -229,8 +229,8 @@ class Interpreter(StrictNodeVisitor):
         cls = type(node.name, tuple([self.visit(b) for b in node.bases]), ns.d)
         cls = self.wrap_decorators(cls, node)
         self.ns[node.name] = cls
-        # Store reference to class object in the AST node
-        node.cls = cls
+        # Store reference to class object in the namespace object
+        ns.cls = cls
 
     def visit_Lambda(self, node):
         node.name = "<lambda>"
@@ -265,13 +265,6 @@ class Interpreter(StrictNodeVisitor):
         # We can't store the values of default arguments - they're dynamic,
         # may depend on the lexical scope.
         func.defaults_dict = d
-
-        # Also, store a reference to containing class, to resolve super()
-        # without arguments later.
-        if isinstance(self.ns, ClassNS):
-            node.class_def = self.ns.node
-        else:
-            node.class_def = None
 
         return InterpFunc(func)
 
@@ -618,7 +611,7 @@ class Interpreter(StrictNodeVisitor):
                 kwargs[kw.arg] = val
 
         if func is builtins.super and not args:
-            if not self.call_stack or not self.call_stack[-1].class_def:
+            if not self.ns.parent or not isinstance(self.ns.parent, ClassNS):
                 raise RuntimeError("super(): no arguments")
             # As we're creating methods dynamically outside of class, super()
             # without argument won't work, as that requires __class__ cell.
@@ -627,7 +620,7 @@ class Interpreter(StrictNodeVisitor):
             # args (which argumentless super() would take from cell and
             # 1st arg to func). In our case, we take them from prepared
             # bookkeeping info.
-            args = (self.call_stack[-1].class_def.cls, self.ns["self"])
+            args = (self.ns.parent.cls, self.ns["self"])
 
         return func(*args, **kwargs)
 
