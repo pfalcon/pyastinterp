@@ -127,8 +127,7 @@ class InterpFuncWrap:
 # bind a method using types.MethodType() in visit_Attribute (but then maybe
 # there would be still other cases of "callable object" vs "function"
 # discrepancies).
-def InterpFunc(node, interp):
-    fun = InterpFuncWrap(node, interp)
+def InterpFunc(fun):
 
     def func(*args, **kwargs):
         return fun.__call__(*args, **kwargs)
@@ -235,20 +234,19 @@ class Interpreter(StrictNodeVisitor):
 
     def visit_Lambda(self, node):
         node.name = "<lambda>"
-        self.prepare_func(node)
-        return InterpFunc(node, self)
+        return self.prepare_func(node)
 
     def visit_FunctionDef(self, node):
         # Defaults are evaluated at function definition time, so we
         # need to do that now.
-        self.prepare_func(node)
-        func = InterpFunc(node, self)
+        func = self.prepare_func(node)
         func = self.wrap_decorators(func, node)
         self.ns[node.name] = func
 
     def prepare_func(self, node):
         """Prepare function AST node for future interpretation: pre-calculate
         and cache useful information, etc."""
+        func = InterpFuncWrap(node, self)
         args = node.args
         num_required = len(args.args) - len(args.defaults)
         all_args = set()
@@ -261,8 +259,12 @@ class Interpreter(StrictNodeVisitor):
             all_args.add(a.arg)
             if v is not None:
                 d[a.arg] = self.visit(v)
-        node.args.defaults_dict = d
+        # We can store cached argument names of a function in its node -
+        # it's static.
         node.args.all_args = all_args
+        # We can't store the values of default arguments - they're dynamic,
+        # may depend on the lexical scope.
+        func.defaults_dict = d
 
         # Also, store a reference to containing class, to resolve super()
         # without arguments later.
@@ -271,7 +273,9 @@ class Interpreter(StrictNodeVisitor):
         else:
             node.class_def = None
 
-    def prepare_func_args(self, node, *args, **kwargs):
+        return InterpFunc(func)
+
+    def prepare_func_args(self, node, interp_func, *args, **kwargs):
 
         def arg_num_mismatch():
             raise TypeError("{}() takes {} positional arguments but {} were given".format(node.name, len(argspec.args), len(args)))
@@ -309,7 +313,7 @@ class Interpreter(StrictNodeVisitor):
         # Finally, overlay default values for arguments not yet initialized.
         # We need to do this last for "multiple values for the same arg"
         # check to work.
-        for k, v in argspec.defaults_dict.items():
+        for k, v in interp_func.defaults_dict.items():
             if k not in self.ns:
                 self.ns[k] = v
 
@@ -329,7 +333,7 @@ class Interpreter(StrictNodeVisitor):
         self.ns = interp_func.lexical_scope
         self.push_ns(FunctionNS(node))
         try:
-            self.prepare_func_args(node, *args, **kwargs)
+            self.prepare_func_args(node, interp_func, *args, **kwargs)
             if isinstance(node.body, list):
                 res = self.stmt_list_visit(node.body)
             else:
