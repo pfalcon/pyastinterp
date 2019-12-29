@@ -152,7 +152,8 @@ class InterpWith:
 
 class Interpreter(StrictNodeVisitor):
 
-    def __init__(self):
+    def __init__(self, fname):
+        self.fname = fname
         self.ns = None
         self.module_ns = None
         # Call stack (in terms of function AST nodes).
@@ -193,6 +194,7 @@ class Interpreter(StrictNodeVisitor):
 
     def visit_Module(self, node):
         self.ns = self.module_ns = ModuleNS(node)
+        self.ns["__file__"] = self.fname
         self.ns["__name__"] = "__main__"
         self.stmt_list_visit(node.body)
 
@@ -796,5 +798,5 @@ if __name__ == "__main__":
 
     sys.argv.pop(0)
     sys.path[0] = os.path.dirname(os.path.abspath(fname))
-    interp = Interpreter()
+    interp = Interpreter(fname)
     interp.visit(tree)
