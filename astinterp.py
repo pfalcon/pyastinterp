@@ -788,9 +788,12 @@ class Interpreter(StrictNodeVisitor):
 
 if __name__ == "__main__":
     import sys
-    tree = ast.parse(open(sys.argv[1]).read())
+    import os
+    fname = sys.argv[1]
+    tree = ast.parse(open(fname).read())
     #print(ast.dump(tree))
 
     sys.argv.pop(0)
+    sys.path[0] = os.path.dirname(os.path.abspath(fname))
     interp = Interpreter()
     interp.visit(tree)
