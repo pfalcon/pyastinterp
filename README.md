@@ -64,6 +64,27 @@ To achieve the goals of minimality, `pyastinterp` does following:
    usage of the "if" statement is.
 
 
+Supported Python subset
+-----------------------
+
+Pyastinterp should implement almost all Python3.5 features, stopping
+at generators, which are not that easy to implement in a tree-walking
+interpreter. It also does not include import hook, so the imported
+modules are interpreted by the underlying Python VM, not by
+Pyastinterp.
+
+
+Running
+-------
+
+Quick way to run something interesting:
+
+    wget https://raw.githubusercontent.com/python/cpython/3.6/Lib/test/pystone.py
+    python3 -m astinterp pystone.my 10000
+
+You can pass any other script on the command line and see how it goes.
+
+
 Credits and licensing
 ---------------------
 
